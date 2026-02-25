@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immortal Path: Spirit Beast Pavilion</title>
+    <style>
+        :root { --gold: #d4af37; --jade: #264d3e; --ink: #0d0d0d; --parchment: #f4e4bc; --spirit: #70a1ff; --chaos: #e84118; }
+        body { 
+            background: var(--ink); color: var(--parchment); font-family: 'Georgia', serif; 
+            margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+            background-image: radial-gradient(circle at center, #1a1a1a 0%, #0d0d0d 100%);
+        }
+        .scroll { 
+            max-width: 900px; width: 95%; border: 2px solid var(--gold); margin: 20px; 
+            padding: 30px; border-radius: 5px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
+            text-align: center;
+        }
+        
+        /* The Spirit Beast Visualizer */
+        #beast-container {
+            width: 200px; height: 200px; margin: 0 auto; position: relative;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #spirit-beast {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: var(--spirit);
+            filter: blur(15px);
+            transition: all 0.5s ease;
+            box-shadow: 0 0 40px var(--spirit);
+        }
+        .beast-eye {
+            position: absolute; width: 10px; height: 10px; background: white;
+            border-radius: 50%; top: 45%; box-shadow: 0 0 10px white;
+        }
+
+        .vein-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 20px; }
+        .vein-card { background: rgba(38, 77, 62, 0.1); border: 1px solid var(--jade); padding: 10px; border-radius: 4px; cursor: pointer; transition: 0.3s; }
+        .vein-card.active { border-color: var(--gold); background: var(--jade); box-shadow: 0 0 10px var(--gold); }
+        
+        .controls { background: rgba(0,0,0,0.6); padding: 15px; border: 1px solid var(--gold); border-radius: 8px; margin: 20px 0; }
+        button { background: transparent; border: 1px solid var(--gold); color: var(--gold); padding: 8px 12px; cursor: pointer; margin: 5px; border-radius: 3px; }
+        button:hover { background: var(--gold); color: var(--ink); }
+        
+        #scripture { font-style: italic; color: var(--spirit); margin: 15px 0; min-height: 40px; }
+        .chaos-mode { border-color: var(--chaos); color: var(--chaos); }
+    </style>
+</head>
+<body>
+
+<div class="scroll">
+    <h1 style="color: var(--gold); letter-spacing: 4px;">HEAVENLY PAVILION</h1>
+    
+    <div id="beast-container">
+        <div id="spirit-beast"></div>
+        <div class="beast-eye" style="left: 35%;"></div>
+        <div class="beast-eye" style="right: 35%;"></div>
+    </div>
+    <div id="beast-name" class="label" style="color: var(--gold); font-size: 0.8rem;">Spirit Familiar: Slumbering</div>
+
+    <div id="scripture">"The Dao that can be told is not the eternal Dao."</div>
+
+    <div class="controls">
+        <div id="timer-label" style="font-weight: bold; margin-bottom: 10px;">Cultivation: Stillness</div>
+        <button onclick="addTime(10)">Meditate 10m</button>
+        <button onclick="saveArray()">Carve Jade Slip</button>
+        <button onclick="loadArray()">Read Jade Slip</button>
+        <button class="chaos-mode" onclick="startTribulation()">INVOKE TRIBULATION</button>
+        <button onclick="stopAll()" style="border-color: #fff; color: #fff;">Extinguish Flame</button>
+    </div>
+
+    <div class="vein-grid" id="vein-grid"></div>
+</div>
+
+<script>
+    const spiritVeins = [
+        {f: 174, z: "Body"}, {f: 285, z: "Marrow"}, {f: 396, z: "Heart"}, {f: 417, z: "Karma"},
+        {f: 432, z: "Earth"}, {f: 528, z: "Core"}, {f: 639, z: "Bond"}, {f: 741, z: "Sense"},
+        {f: 852, z: "Truth"}, {f: 963, z: "Unity"}, {f: 40, z: "Focus"}, {f: 7.83, z: "Pulse"}
+    ];
+
+    let audioCtx, tribulationOsc, timerInt, secLeft = 0;
+    let activeVeins = {};
+    const beast = document.getElementById('spirit-beast');
+    const bName = document.getElementById('beast-name');
+
+    const grid = document.getElementById('vein-grid');
+    spiritVeins.forEach(v => {
+        const el = document.createElement('div');
+        el.className = 'vein-card'; el.id = `v-${v.f}`;
+        el.innerHTML = `<div style="font-size:0.7rem; opacity:0.6">${v.z}</div><strong>${v.f}Hz</strong>`;
+        el.onclick = () => toggleVein(v.f);
+        grid.appendChild(el);
+    });
+
+    function init() { if(!audioCtx) audioCtx = new AudioContext(); }
+
+    function updateBeast() {
+        const activeCount = Object.keys(activeVeins).length;
+        if (activeCount === 0) {
+            beast.style.background = 'var(--spirit)';
+            beast.style.transform = 'scale(1)';
+            bName.innerText = "Spirit Familiar: Slumbering";
+            return;
+        }
+
+        // Calculate average frequency to change color
+        const avgHz = Object.keys(activeVeins).reduce((a,b) => a + parseFloat(b), 0) / activeCount;
+        
+        // Visual effects
+        const scale = 1 + (activeCount * 0.2);
+        const hue = (avgHz / 1000) * 360;
+        beast.style.transform = `scale(${scale})`;
+        beast.style.background = `hsl(${hue}, 70%, 60%)`;
+        beast.style.boxShadow = `0 0 40px hsl(${hue}, 70%, 60%)`;
+        bName.innerText = "Spirit Familiar: Awakening";
+    }
+
+    function toggleVein(hz) {
+        init();
+        if (activeVeins[hz]) {
+            activeVeins[hz].osc.stop();
+            delete activeVeins[hz];
+            document.getElementById(`v-${hz}`).classList.remove('active');
+        } else {
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0, audioCtx.currentTime);
+            g.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 1);
+            const osc = audioCtx.createOscillator();
+            osc.frequency.value = hz;
+            osc.connect(g).connect(audioCtx.destination);
+            osc.start();
+            activeVeins[hz] = { osc, g };
+            document.getElementById(`v-${hz}`).classList.add('active');
+        }
+        updateBeast();
+    }
+
+    function startTribulation() {
+        init();
+        if (tribulationOsc) return;
+        beast.style.background = 'var(--chaos)';
+        beast.style.animation = 'shake 0.1s infinite';
+        bName.innerText = "Spirit Familiar: DISTRESSED";
+        
+        tribulationOsc = audioCtx.createOscillator();
+        tribulationOsc.type = 'sawtooth';
+        tribulationOsc.frequency.value = 45; 
+        const g = audioCtx.createGain();
+        g.gain.value = 0.04;
+        tribulationOsc.connect(g).connect(audioCtx.destination);
+        tribulationOsc.start();
+    }
+
+    function stopAll() {
+        clearInterval(timerInt); timerInt = null; secLeft = 0;
+        Object.values(activeVeins).forEach(v => v.osc.stop());
+        activeVeins = {};
+        if(tribulationOsc) { tribulationOsc.stop(); tribulationOsc = null; }
+        beast.style.animation = 'none';
+        updateBeast();
+        document.querySelectorAll('.vein-card').forEach(c => c.classList.remove('active'));
+        document.getElementById('timer-label').innerText = "Cultivation: Stillness";
+    }
+
+    function addTime(m) {
+        secLeft += m*60;
+        if(!timerInt) timerInt = setInterval(() => {
+            secLeft--; updateTimer();
+            if(secLeft<=0) stopAll();
+        }, 1000);
+    }
+
+    function updateTimer() {
+        let m = Math.floor(secLeft/60), s = secLeft%60;
+        document.getElementById('timer-label').innerText = `Session: ${m}:${s<10?'0':''}${s}`;
+    }
+
+    function saveArray() { localStorage.setItem('beast_dao', JSON.stringify(Object.keys(activeVeins))); alert("Qi Preset Saved."); }
+    function loadArray() { 
+        const saved = JSON.parse(localStorage.getItem('beast_dao'));
+        if(saved) { stopAll(); saved.forEach(hz => toggleVein(parseFloat(hz))); }
+    }
+</script>
+</body>
+</html>
